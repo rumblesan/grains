@@ -3,6 +3,22 @@ s = Server.local
 
 s.boot
 
+(
+  MIDIClient.init;
+  MIDIIn.connectAll;
+
+  m = MIDIFunc.noteOn({ |vel, num|
+    "note % @ velocity %\n".postf(num, vel);
+  });
+
+  c = MIDIFunc.cc({ |value, ccnum|
+    "cc % @ val %\n".postf(ccnum, value);
+  });
+)
+
+m.free;
+c.free;
+
 b = Buffer.readChannel(s, "/Users/guy/src/grains/sounds/vox.wav", channels: [0]);
 
 (

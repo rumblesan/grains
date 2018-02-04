@@ -1,73 +1,112 @@
 
-s = Server.local
-
-s.boot
-
 (
+  s = Server.local;
+  s.boot;
   MIDIClient.init;
   MIDIIn.connectAll;
-
-  v = Dictionary.new;
-  v.put(33, Bus.control(s,1));
-
-  m = MIDIFunc.noteOn({ |vel, num|
-    "note on  % @ velocity %\n".postf(num, vel);
-    v.at(num).set(1.0);
-  });
-
-  o = MIDIFunc.noteOff({ |vel, num|
-    "note off % @ velocity %\n".postf(num, vel);
-    v.at(num).set(0.0);
-  });
-
-  c = MIDIFunc.cc({ |value, ccnum|
-    "cc % @ val %\n".postf(ccnum, value);
-  });
-)
-
-m.free;
-c.free;
-
-b = Buffer.readChannel(s, "/Users/guy/src/grains/sounds/vox.wav", channels: [0]);
-
-(
-  SynthDef("mygrainbuf", {
-    arg trate = 1, bufnum = 0, busnum;
-    var dur = 8 / trate;
-    var trig = InTrig.kr( busnum );
-    var pos = Integrator.kr(BrownNoise.kr(0.001));
-    var pan = WhiteNoise.kr(0.6);
-    var g = GrainBuf.ar(2, trig, dur, bufnum, 1, pos, 1, pan, -1);
-    Out.ar(0, g);
-  }).send(s);
 )
 
 (
   SynthDef("mytgrains", {
-    arg trate = 1, bufnum = 0;
-    var dur = 8 / trate;
-    var trig = InTrig.kr( busnum );
-    var pos = Integrator.kr(BrownNoise.kr(0.001));
-    var pan = WhiteNoise.kr(0.6);
-    var g = TGrains.ar(2, trig, bufnum, 1, pos, dur, pan, 0.1);
+    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
+    var trig = Impulse.kr(trate, 0, onoff);
+    var duration = 2 / trate;
+    var pos = Mix.kr([
+      coursepos,
+      finepos,
+      Integrator.kr((1/trate) * BrownNoise.kr(spreadpos));
+    ]);
+    var pan = WhiteNoise.kr(panspread);
+    var g = TGrains.ar(2, trig, sampleBuffer, 1, pos, duration, pan, 0.1);
+    Out.ar(0, g);
+  }).send(s);
+
+  SynthDef("mygrainbuf", {
+    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
+    var duration = 2 / trate;
+    var trig = Impulse.kr(trate, 0, onoff);
+    var pos = Mix.kr([
+      coursepos,
+      finepos,
+      Integrator.kr((1/trate) * BrownNoise.kr(spreadpos));
+    ]);
+    var pan = WhiteNoise.kr(panspread);
+    var g = GrainBuf.ar(2, trig, duration, sampleBuffer, 1, pos, 1, pan, -1);
     Out.ar(0, g);
   }).send(s);
 )
 
 (
-  SynthDef("playback", {
-    arg out = 0, bufnum = 0;
-    var snd = PlayBuf.ar(1, bufnum, BufRateScale.kr(bufnum));
-    Out.ar(out, snd);
-  }).send(s);
+~setup = { arg synthName, triggerNote, samplePath, controlList;
+
+  var sampleBuffer = Buffer.readChannel(s, samplePath, channels: [0]);
+
+  var scalingFuncs = Dictionary.with(*[
+    \trate -> ({ arg value;
+      (1 + value / 4);
+    }),
+    \panspread -> ({ arg value;
+      (value / 128);
+    }),
+    \coursepos -> ({ arg value;
+      (value / 128);
+    }),
+    \finepos -> ({ arg value;
+      (value / 2560);
+    }),
+    \spreadpos -> ({ arg value;
+      (value / 400);
+    })
+  ]);
+
+  var grains = Synth(synthName, [
+    "sampleBuffer", sampleBuffer,
+  ]);
+
+  var noteOnListener = MIDIFunc.noteOn({ |vel, num|
+    "% on\n".postf(num);
+    grains.set(\onoff, 1.0);
+  }, triggerNote);
+
+  var noteOffListener = MIDIFunc.noteOff({ |vel, num|
+    "% off\n".postf(num);
+    grains.set(\onoff, 0.0);
+  }, triggerNote);
+
+
+  var ccListeners = controlList.collect({ arg control;
+    var controlName = control.key;
+    var ccNum = control.value;
+    var func = scalingFuncs.at(controlName);
+
+    var ccListener = MIDIFunc.cc({ |ccVal|
+      var val = func.value(ccVal);
+      "% @ %\n".postf(controlName, val);
+      grains.set(controlName, val);
+    }, ccNum);
+
+    ccListener;
+  });
+
+  var cleanup = {
+    sampleBuffer.free;
+    noteOnListener.free;
+    noteOffListener.free;
+    grains.free;
+    ccListeners.do{ arg listener;
+      listener.free;
+    }
+  };
+
+  cleanup;
+};
 )
 
-g = Synth("mygrainbuf", ["bufnum", b.bufnum, "busnum", v.at(33)])
-g.free
+~g1 = ~setup.value("mytgrains", 33, "/Users/guy/src/grains/sounds/vox.wav", [\trate -> 1, \panspread -> 5, \coursepos -> 9, \finepos -> 13, \spreadpos -> 17]);
 
-g = Synth("mytgrains", ["bufnum", b.bufnum])
-g.free
+~g2 = ~setup.value("mygrainbuf", 34, "/Users/guy/src/grains/sounds/vox.wav", [\trate -> 2, \panspread -> 6, \spreadpos -> 10, \finepos -> 14, \spreadpos -> 18]);
 
-p = Synth("playback", ["bufnum", b.bufnum, "busnum", v.at(1)])
-p.free
+~g1.value;
+
+~g2.value;
 

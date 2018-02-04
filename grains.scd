@@ -11,10 +11,11 @@
     arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
     var trig = Impulse.kr(trate, 0, onoff);
     var duration = 2 / trate;
+    var posDelta = (duration / BufDur.kr(sampleBuffer));
     var pos = Mix.kr([
       coursepos,
       finepos,
-      Integrator.kr((1/trate) * BrownNoise.kr(spreadpos));
+      Integrator.kr(posDelta * BrownNoise.kr(spreadpos));
     ]);
     var pan = WhiteNoise.kr(panspread);
     var g = TGrains.ar(2, trig, sampleBuffer, 1, pos, duration, pan, 0.1);
@@ -24,11 +25,12 @@
   SynthDef("mygrainbuf", {
     arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
     var duration = 2 / trate;
+    var posDelta = (duration / BufDur.kr(sampleBuffer));
     var trig = Impulse.kr(trate, 0, onoff);
     var pos = Mix.kr([
       coursepos,
       finepos,
-      Integrator.kr((1/trate) * BrownNoise.kr(spreadpos));
+      Integrator.kr(posDelta * BrownNoise.kr(spreadpos));
     ]);
     var pan = WhiteNoise.kr(panspread);
     var g = GrainBuf.ar(2, trig, duration, sampleBuffer, 1, pos, 1, pan, -1);

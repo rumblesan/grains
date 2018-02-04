@@ -8,7 +8,7 @@
 
 (
   SynthDef("mytgrains", {
-    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
+    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer, volume = 0.1, speed = 1;
     var trig = Impulse.kr(trate, 0, onoff);
     var duration = 2 / trate;
     var posDelta = (duration / BufDur.kr(sampleBuffer));
@@ -18,12 +18,12 @@
       Integrator.kr(posDelta * BrownNoise.kr(spreadpos));
     ]);
     var pan = WhiteNoise.kr(panspread);
-    var g = TGrains.ar(2, trig, sampleBuffer, 1, pos, duration, pan, 0.1);
+    var g = TGrains.ar(2, trig, sampleBuffer, speed, pos, duration, pan, volume, 2);
     Out.ar(0, g);
   }).send(s);
 
   SynthDef("mygrainbuf", {
-    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer;
+    arg trate = 1, onoff = 0, panspread = 0, coursepos = 0, finepos = 0, spreadpos = 0, sampleBuffer, volume = 0.1, speed = 1;
     var duration = 2 / trate;
     var posDelta = (duration / BufDur.kr(sampleBuffer));
     var trig = Impulse.kr(trate, 0, onoff);
@@ -32,8 +32,9 @@
       finepos,
       Integrator.kr(posDelta * BrownNoise.kr(spreadpos));
     ]);
+    var maxgrains = 512;
     var pan = WhiteNoise.kr(panspread);
-    var g = GrainBuf.ar(2, trig, duration, sampleBuffer, 1, pos, 1, pan, -1);
+    var g = GrainBuf.ar(2, trig, duration, sampleBuffer, speed, pos, 1, pan, -1, maxgrains, volume);
     Out.ar(0, g);
   }).send(s);
 )
@@ -47,18 +48,24 @@
     \trate -> ({ arg value;
       (1 + value / 4);
     }),
-    \panspread -> ({ arg value;
-      (value / 128);
-    }),
     \coursepos -> ({ arg value;
       (value / 128);
+    }),
+    \speed -> ({ arg value;
+      ((value - 64) / 30);
     }),
     \finepos -> ({ arg value;
       (value / 2560);
     }),
     \spreadpos -> ({ arg value;
       (value / 400);
-    })
+    }),
+    \panspread -> ({ arg value;
+      (value / 128);
+    }),
+    \volume -> ({ arg value;
+      (value / 100);
+    }),
   ]);
 
   var grains = Synth(synthName, [
@@ -104,9 +111,31 @@
 };
 )
 
-~g1 = ~setup.value("mytgrains", 33, "/Users/guy/src/grains/sounds/vox.wav", [\trate -> 1, \panspread -> 5, \coursepos -> 9, \finepos -> 13, \spreadpos -> 17]);
+(
+~g1 = ~setup.value("mytgrains", 33, "/Users/guy/src/grains/sounds/vox.wav",
+  [
+    \trate -> 1,
+    \speed -> 5,
+    \coursepos -> 9,
+    \finepos -> 13,
+    \spreadpos -> 17,
+    \panspread -> 21,
+    \volume -> 25,
+  ]);
+)
 
-~g2 = ~setup.value("mygrainbuf", 34, "/Users/guy/src/grains/sounds/vox.wav", [\trate -> 2, \panspread -> 6, \spreadpos -> 10, \finepos -> 14, \spreadpos -> 18]);
+(
+~g2 = ~setup.value("mygrainbuf", 34, "/Users/guy/src/grains/sounds/vox.wav",
+  [
+    \trate -> 2,
+    \speed -> 6,
+    \coursepos -> 10,
+    \finepos -> 14,
+    \spreadpos -> 18,
+    \panspread -> 22,
+    \volume -> 26,
+]);
+)
 
 ~g1.value;
 

@@ -4,6 +4,8 @@
   s.boot;
   MIDIClient.init;
   MIDIIn.connectAll;
+  MIDIClient.destinations;
+  m = MIDIOut.newByName("Code", "Controls")
 )
 
 (
@@ -40,9 +42,33 @@
 )
 
 (
-~setup = { arg synthName, triggerNote, samplePath, controlList;
+~setup = { arg midiOut, synthName, triggerNote, samplePath, controlList;
 
   var sampleBuffer = Buffer.readChannel(s, samplePath, channels: [0]);
+
+  var reverseValFuncs = Dictionary.with(*[
+    \trate -> ({ arg value;
+      ((value - 1) * 4);
+    }),
+    \coursepos -> ({ arg value;
+      (value * 128);
+    }),
+    \speed -> ({ arg value;
+      ((value * 30) + 64);
+    }),
+    \finepos -> ({ arg value;
+      (value * 2560);
+    }),
+    \spreadpos -> ({ arg value;
+      (value * 400);
+    }),
+    \panspread -> ({ arg value;
+      (value * 128);
+    }),
+    \volume -> ({ arg value;
+      (value * 100);
+    }),
+  ]);
 
   var scalingFuncs = Dictionary.with(*[
     \trate -> ({ arg value;
@@ -87,6 +113,11 @@
     var controlName = control.key;
     var ccNum = control.value;
     var func = scalingFuncs.at(controlName);
+    var revFunc = reverseValFuncs.at(controlName);
+
+    var defaultVal = grains.get(controlName, { |controlVal|
+      midiOut.control(0, ccNum, revFunc.value(controlVal));
+    });
 
     var ccListener = MIDIFunc.cc({ |ccVal|
       var val = func.value(ccVal);
@@ -112,7 +143,7 @@
 )
 
 (
-~g1 = ~setup.value("mytgrains", 33, "/Users/guy/src/grains/sounds/vox.wav",
+~g1 = ~setup.value(m, "mytgrains", 33, "/Users/guy/src/grains/sounds/vox.wav",
   [
     \trate -> 1,
     \speed -> 5,
@@ -125,7 +156,7 @@
 )
 
 (
-~g2 = ~setup.value("mygrainbuf", 34, "/Users/guy/src/grains/sounds/vox.wav",
+~g2 = ~setup.value(m, "mygrainbuf", 34, "/Users/guy/src/grains/sounds/vox.wav",
   [
     \trate -> 2,
     \speed -> 6,
